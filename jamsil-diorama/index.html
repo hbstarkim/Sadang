@@ -65,7 +65,9 @@ body {
 .ln.l8 { background: var(--l8); }
 .coord { font: 400 11.5px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .note { margin: 2px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
-.clock { font: 500 11.5px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.clock { font: 500 11.5px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.north { display: inline-flex; align-items: center; gap: 4px; }
+.north svg { width: 16px; height: 16px; fill: var(--l8); transition: transform 0.1s linear; }
 
 .rail {
   position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
@@ -136,10 +138,10 @@ body {
   <div class="lines">
     <span class="item"><span class="ln l2">2</span>2호선</span>
     <span class="item"><span class="ln l8">8</span>8호선</span>
-    <span class="coord">37.5133°N 127.1000°E</span>
+    <span class="coord">37.5133°N 127.1003°E</span>
   </div>
-  <p class="note" id="note">지도 데이터 없이 손으로 배치한 토이 디오라마예요. 위치는 대략적이고, 높은 건물은 실제보다 낮춰 표현했어요.</p>
-  <div class="clock">서울 지금 <span id="clock">--:--</span></div>
+  <p class="note" id="note">공개된 좌표와 주소를 참고해 손으로 배치한 토이 디오라마예요. 판은 올림픽로·송파대로 축에 맞춰 약 13° 돌아가 있고, 나침반의 N이 정북이에요. 높은 건물은 실제보다 낮춰 표현했어요.</p>
+  <div class="clock"><span>서울 지금 <span id="clock">--:--</span></span><span class="north" title="화면 기준 정북 방향"><svg id="north" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 L14.5 15 L10 11.8 L5.5 15 Z"></path></svg>정북</span></div>
 </header>
 
 <div class="hint">드래그 회전 · 휠 확대 · 우클릭 드래그 이동</div>
@@ -387,10 +389,22 @@ function slab(shape, top, thick, mat, seg = 10) {
   return m;
 }
 
-// Seokchon Lake: 서호 (west, with Magic Island) and 동호 (east), split by 송파대로.
+/* ------------------------------------------------------------------ *
+ * Layout frame. The board is squared to the street grid: +x runs east along
+ * 올림픽로, +z runs south along 송파대로. That grid sits about 13° clockwise
+ * from true north (the compass rose on the board shows it). Positions below come
+ * from published coordinates where available (잠실역 37.51333/127.10028,
+ * 롯데월드타워 37.5125/127.10278, 롯데월드 어드벤처 37.51114/127.09813,
+ * 매직아일랜드 37.50865/127.09953, 잠실나루역 37.52028/127.10389) converted
+ * into this frame, and from address/side-of-road facts for the rest.
+ * ------------------------------------------------------------------ */
+const GRID_ROT = -0.2296;                 // grid u-axis bearing relative to true east (rad)
+const JR = 29.5;                          // 잠실로 centre line (z)
+
+// Seokchon Lake: 서호 (west, with Magic Island) and 동호 (east), split by 송파대로 at 잠실호수교.
 const LAKES = [
-  { cx: -25, cz: 47, rx: 19, rz: 14, rot: 0.15, name: '석촌호수 서호' },
-  { cx: 27, cz: 47, rx: 21, rz: 12, rot: -0.12, name: '석촌호수 동호' }
+  { cx: -24.5, cz: 47.5, rx: 19.5, rz: 12.5, rot: 0.04, name: '석촌호수 서호' },
+  { cx: 28.5, cz: 46.5, rx: 22, rz: 11.5, rot: 0.16, name: '석촌호수 동호' }
 ];
 function ellipsePoint(L, t, grow = 0) {
   const u = (L.rx + grow) * Math.cos(t), v = (L.rz + grow) * Math.sin(t);
@@ -426,7 +440,7 @@ const waterMat = new THREE.MeshStandardMaterial({ color: '#73bfe0', roughness: 0
   const plinth = slab(rrShape(X0 - 1.2, X1 + 1.2, Z0 - 1.2, Z1 + 1.2, [7.2, 7.2, 7.2, 7.2]), -5.4, 1.7, std('#3c3843', { roughness: 0.6 }), 14);
   plinth.castShadow = true;
 
-  // water + lake trail
+  // water + 석촌호수 산책로
   LAKES.forEach(L => {
     const wg = new THREE.ShapeGeometry(ellipsePath(L, 0.05), 1);
     wg.rotateX(-Math.PI / 2);
@@ -446,17 +460,17 @@ const waterMat = new THREE.MeshStandardMaterial({ color: '#73bfe0', roughness: 0
     g.font = '600 58px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif'; g.textBaseline = 'middle';
     g.fillText('잠실역  JAMSIL STATION', 44, h / 2 + 2);
     g.font = '500 30px "IBM Plex Mono", monospace'; g.textAlign = 'right';
-    g.fillText('37.5133°N  127.1000°E  ·  1:1000', w - 44, h / 2 + 2);
+    g.fillText('37.5133°N  127.1003°E  ·  1:1000', w - 44, h / 2 + 2);
   });
   const pm = new THREE.Mesh(new THREE.PlaneGeometry(8.2, 1.2), new THREE.MeshStandardMaterial({ map: plaque, metalness: 0.35, roughness: 0.45 }));
   pm.position.set(0, -6.25, Z1 + 1.21); scene.add(pm);
 
-  // subway tunnel portals on the board's soil faces: Line 8 runs N–S under 송파대로, Line 2 runs E–W under 올림픽로
+  // subway tunnel portals on the board's soil faces:
+  // Line 8 runs N–S under 송파대로; Line 2 runs west under 올림픽로 and bends north-east toward 잠실나루역.
   const portal = (color, num) => canvasTex(256, 224, (g, w, h) => {
     g.clearRect(0, 0, w, h);
     g.fillStyle = '#9a9286'; g.beginPath(); g.moveTo(14, h); g.lineTo(14, 112); g.arc(128, 112, 114, Math.PI, 0); g.lineTo(242, h); g.fill();
     g.fillStyle = '#2a2420'; g.beginPath(); g.moveTo(34, h); g.lineTo(34, 112); g.arc(128, 112, 94, Math.PI, 0); g.lineTo(222, h); g.fill();
-    // train face
     g.fillStyle = color; roundRect(g, 62, 70, 132, 154, 26); g.fill();
     g.fillStyle = '#2f3a46'; roundRect(g, 76, 88, 104, 50, 12); g.fill();
     g.fillStyle = '#ffffff'; g.beginPath(); g.arc(128, 162, 15, 0, Math.PI * 2); g.fill();
@@ -470,8 +484,22 @@ const waterMat = new THREE.MeshStandardMaterial({ color: '#73bfe0', roughness: 0
   };
   addPortal(p8, 0, Z1 + 0.02, 0);
   addPortal(p8, 0, Z0 - 0.02, Math.PI);
-  addPortal(p2, X1 + 0.02, 0, Math.PI / 2);
-  addPortal(p2, X0 - 0.02, 0, -Math.PI / 2);
+  addPortal(p2, 31.5, Z0 - 0.02, Math.PI);           // toward 잠실나루역
+  addPortal(p2, X0 - 0.02, 0, -Math.PI / 2);         // toward 잠실새내역
+
+  // compass rose: N points to true north, about 13° off the street grid
+  const rose = canvasTex(256, 256, (g, w) => {
+    g.clearRect(0, 0, w, w);
+    g.fillStyle = 'rgba(255,250,240,0.92)'; g.beginPath(); g.arc(128, 128, 120, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#3c3843'; g.lineWidth = 5; g.stroke();
+    g.fillStyle = '#e2156b'; g.beginPath(); g.moveTo(128, 30); g.lineTo(150, 128); g.lineTo(106, 128); g.closePath(); g.fill();
+    g.fillStyle = '#3c3843'; g.beginPath(); g.moveTo(128, 226); g.lineTo(150, 128); g.lineTo(106, 128); g.closePath(); g.fill();
+    g.font = '700 40px "IBM Plex Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#3c3843'; g.fillText('N', 128, 18 + 6);
+  });
+  const rg = new THREE.CircleGeometry(2.6, 40); rg.rotateX(-Math.PI / 2);
+  const rm = new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ map: rose, transparent: true, roughness: 0.7 }));
+  rm.position.set(52.6, 0.03, 62.6); rm.rotation.y = GRID_ROT; rm.receiveShadow = true; scene.add(rm);
 }
 function roundRect(g, x, y, w, h, r) {
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
@@ -482,12 +510,12 @@ function roundRect(g, x, y, w, h, r) {
 const ROADS = [
   { x0: X0, x1: X1, z0: -2.5, z1: 2.5, name: '올림픽로' },
   { x0: -2.5, x1: 2.5, z0: Z0, z1: Z1, name: '송파대로' },
-  { x0: X0, x1: X1, z0: 26.2, z1: 29.8, name: '잠실로' },
-  { x0: -41.1, x1: -38.9, z0: 2.5, z1: 26.2 },
-  { x0: -31.1, x1: -28.9, z0: Z0, z1: -2.5 },
-  { x0: X0, x1: -2.5, z0: -25.1, z1: -22.9 },
-  { x0: 42.9, x1: 45.1, z0: Z0, z1: -2.5 },
-  { x0: 38.9, x1: 41.1, z0: 2.5, z1: 26.2 }
+  { x0: X0, x1: X1, z0: JR - 1.8, z1: JR + 1.8, name: '잠실로' },
+  { x0: 9.9, x1: 12.1, z0: Z0, z1: -2.5 },            // 롯데캐슬골드 | 장미아파트
+  { x0: 12.1, x1: X1, z0: -24.4, z1: -22.2 },          // 장미아파트 단지 안길
+  { x0: X0, x1: -2.5, z0: -24.4, z1: -22.2 },          // 주공5단지 단지 안길
+  { x0: 35.9, x1: 38.1, z0: 2.5, z1: JR - 1.8 },       // 롯데월드몰 | 송파구청
+  { x0: -38.1, x1: -35.9, z0: 2.5, z1: JR - 1.8 }      // 롯데월드 | 갤러리아팰리스
 ];
 const roadMat = std('#5f6874', { roughness: 0.95 });
 ROADS.forEach(r => {
@@ -505,24 +533,21 @@ const onRoad = (x, z, m = 0) => ROADS.some(r => x > r.x0 - m && x < r.x1 + m && 
   const dashedZ = (x, a, b) => { for (let z = a; z < b - 0.7; z += 1.6) seg(white, x, z + 0.35, 0.07, 0.7); };
   const lineX = (z, a, b) => seg(yellow, (a + b) / 2, z, b - a, 0.07);
   const lineZ = (x, a, b) => seg(yellow, x, (a + b) / 2, 0.07, b - a);
-  // 올림픽로
   [[X0 + 0.1, -4.6], [4.6, X1 - 0.1]].forEach(([a, b]) => { lineX(-0.09, a, b); lineX(0.09, a, b); dashedX(-1.25, a, b); dashedX(1.25, a, b); });
-  // 송파대로
-  [[Z0 + 0.1, -4.6], [4.6, 24.3], [31.7, Z1 - 0.1]].forEach(([a, b]) => { lineZ(-0.09, a, b); lineZ(0.09, a, b); dashedZ(-1.25, a, b); dashedZ(1.25, a, b); });
-  // 잠실로
-  [[X0 + 0.1, -4.6], [4.6, X1 - 0.1]].forEach(([a, b]) => { lineX(27.92, a, b); lineX(28.08, a, b); });
+  [[Z0 + 0.1, -4.6], [4.6, JR - 3.8], [JR + 3.8, Z1 - 0.1]].forEach(([a, b]) => { lineZ(-0.09, a, b); lineZ(0.09, a, b); dashedZ(-1.25, a, b); dashedZ(1.25, a, b); });
+  [[X0 + 0.1, -4.6], [4.6, X1 - 0.1]].forEach(([a, b]) => { lineX(JR - 0.08, a, b); lineX(JR + 0.08, a, b); });
   // stop lines
   seg(white, -4.5, 1.25, 0.14, 2.4); seg(white, 4.5, -1.25, 0.14, 2.4);
   seg(white, -1.25, -4.5, 2.4, 0.14); seg(white, 1.25, 4.5, 2.4, 0.14);
-  seg(white, -1.25, 24.4, 2.4, 0.14); seg(white, 1.25, 31.6, 2.4, 0.14);
-  seg(white, -4.5, 28.9, 0.14, 1.7); seg(white, 4.5, 27.1, 0.14, 1.7);
+  seg(white, -1.25, JR - 3.6, 2.4, 0.14); seg(white, 1.25, JR + 3.6, 2.4, 0.14);
+  seg(white, -4.5, JR + 0.9, 0.14, 1.7); seg(white, 4.5, JR - 0.9, 0.14, 1.7);
   // zebra crossings
   const zebraAcrossX = (cx, z0, z1) => { for (let z = z0 + 0.25; z < z1 - 0.1; z += 0.55) seg(white, cx, z, 1.3, 0.28); };
   const zebraAcrossZ = (cz, x0, x1) => { for (let x = x0 + 0.25; x < x1 - 0.1; x += 0.55) seg(white, x, cz, 0.28, 1.3); };
   zebraAcrossX(-3.45, -2.5, 2.5); zebraAcrossX(3.45, -2.5, 2.5);
   zebraAcrossZ(-3.45, -2.5, 2.5); zebraAcrossZ(3.45, -2.5, 2.5);
-  zebraAcrossX(-3.45, 26.2, 29.8); zebraAcrossX(3.45, 26.2, 29.8);
-  zebraAcrossZ(25.45, -2.5, 2.5); zebraAcrossZ(30.55, -2.5, 2.5);
+  zebraAcrossX(-3.45, JR - 1.8, JR + 1.8); zebraAcrossX(3.45, JR - 1.8, JR + 1.8);
+  zebraAcrossZ(JR - 2.55, -2.5, 2.5); zebraAcrossZ(JR + 2.55, -2.5, 2.5);
 
   const box = new THREE.BoxGeometry(1, 0.012, 1);
   [[white, '#f4f2ea'], [yellow, '#f2c447']].forEach(([arr, col]) => {
@@ -535,16 +560,16 @@ const onRoad = (x, z, m = 0) => ROADS.some(r => x > r.x0 - m && x < r.x1 + m && 
 
 /* ---------------- city blocks (raised pads) ---------------- */
 const PADS = [
-  [-28.6, -2.8, -22.6, -2.8, 'apt'],
-  [-28.6, -2.8, -43.5, -25.4, 'apt'],
-  [-57.5, -31.4, -22.6, -2.8, 'apt'],
-  [-57.5, -31.4, -43.5, -25.4, 'apt', [5.5, 0.3, 0.3, 0.3]],
-  [2.8, 42.6, -43.5, -2.8, 'apt'],
-  [45.4, 57.5, -43.5, -2.8, 'plaza', [0.3, 5.5, 0.3, 0.3]],
-  [-38.6, -2.8, 2.8, 25.9, 'plaza'],
-  [-57.5, -41.4, 2.8, 25.9, 'plaza'],
-  [2.8, 38.6, 2.8, 25.9, 'plaza'],
-  [41.4, 57.5, 2.8, 25.9, 'plaza']
+  [-57.5, -2.8, -21.9, -2.8, 'apt'],                          // 잠실주공5단지 (south half)
+  [-57.5, -2.8, -43.5, -24.7, 'apt', [5.5, 0.3, 0.3, 0.3]],   // 잠실주공5단지 (north half)
+  [2.8, 9.6, -43.5, -2.8, 'plaza'],                           // 롯데캐슬골드
+  [12.4, 57.5, -21.9, -2.8, 'apt'],                           // 장미아파트
+  [12.4, 57.5, -43.5, -24.7, 'apt', [0.3, 5.5, 0.3, 0.3]],
+  [-35.6, -2.8, 2.8, JR - 2.1, 'plaza'],                      // 롯데월드
+  [-57.5, -38.4, 2.8, JR - 2.1, 'plaza'],                     // 갤러리아팰리스
+  [2.8, 35.6, 2.8, JR - 2.1, 'plaza'],                        // 롯데월드타워·몰
+  [38.4, 57.5, 2.8, JR - 2.1, 'plaza'],                       // 송파구청
+  [-57.5, -47.2, JR + 2.1, 67.5, 'apt', [0.3, 0.3, 0.3, 5.5]] // 레이크팰리스
 ];
 PADS.forEach(([x0, x1, z0, z1, type, r]) => slab(rrShape(x0, x1, z0, z1, r), PAD, PAD, type === 'apt' ? aptGroundMat : plazaMat, 6));
 const groundY = (x, z) => PADS.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1) ? PAD : 0;
@@ -586,8 +611,8 @@ function numberTex(num) {
     g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(num), w / 2, h / 2 + 4);
   });
 }
-function aptSlab(x, z, len, dep, hm, num, stripe) {
-  const m = building({ x, z, w: len, d: dep, hm, kind: 'apt', color: '#f7f5f0', roof: '#cfd6d1', top: 'none' });
+function aptSlab(x, z, len, dep, hm, num, stripe, wall = '#f7f5f0') {
+  const m = building({ x, z, w: len, d: dep, hm, kind: 'apt', color: wall, roof: '#cfd6d1', top: 'none' });
   const h = H(hm);
   const band = new THREE.Mesh(new THREE.BoxGeometry(len + 0.03, 0.2, dep + 0.03), std(stripe));
   band.position.y = h / 2 - 0.28; m.add(band);
@@ -617,7 +642,7 @@ const towerLit = canvasTex(128, 128, (g) => {
 towerLit.wrapS = towerLit.wrapT = THREE.RepeatWrapping; towerLit.repeat.set(8, 26);
 const towerMat = new THREE.MeshStandardMaterial({ color: '#fbfdff', map: towerTex, emissiveMap: towerLit, emissive: '#ffffff', emissiveIntensity: 0, roughness: 0.4, metalness: 0, flatShading: true });
 const lanternMat = new THREE.MeshStandardMaterial({ color: '#fff4cf', emissive: '#ffe7a0', emissiveIntensity: 0.25 });
-const TOWER = { x: 21, z: 11, h: H(555) };
+const TOWER = { x: 19.4, z: 13.6, h: H(555) };
 {
   const r0 = 3.9, pts = [];
   for (let i = 0; i <= 28; i++) { const t = i / 28; pts.push(new THREE.Vector2(r0 * (1 - 0.69 * Math.pow(t, 1.6)), t * TOWER.h)); }
@@ -636,22 +661,34 @@ const TOWER = { x: 21, z: 11, h: H(555) };
   addFoot(TOWER.x, TOWER.z, 5.6, 5.6);
 }
 
-/* SE block: 롯데월드몰 */
-building({ x: 9, z: 8, w: 9, d: 7, hm: 45, color: '#efe6d8', roof: '#d9d4c8' });          // 에비뉴엘
-building({ x: 10, z: 19.5, w: 12, d: 9, hm: 35, color: '#f3eee6', roof: '#cfd8d6' });      // 쇼핑몰
-building({ x: 21, z: 19.5, w: 6, d: 7, hm: 22, color: '#e8eef2', roof: '#d0d7da', top: 'none' });
-building({ x: 31, z: 19.5, w: 12, d: 9, hm: 50, color: '#e9e2f0', roof: '#d6d2df' });      // 엔터테인먼트동
+/* SE block: 롯데월드몰 around the tower, 동호 right across 잠실로 */
+building({ x: 8.5, z: 7.5, w: 8, d: 6.5, hm: 45, color: '#efe6d8', roof: '#d9d4c8' });      // 에비뉴엘
+building({ x: 9, z: 19.6, w: 11, d: 10, hm: 35, color: '#f3eee6', roof: '#cfd8d6' });        // 쇼핑몰
+building({ x: 18, z: 22.2, w: 6, d: 6, hm: 22, color: '#e8eef2', roof: '#d0d7da', top: 'none' });
+building({ x: 28.6, z: 20.6, w: 12, d: 9.5, hm: 50, color: '#e9e2f0', roof: '#d6d2df' });    // 엔터테인먼트동 (시네마·아쿠아리움)
 { // tower forecourt lawn
-  const lawn = new THREE.Mesh(new THREE.BoxGeometry(12, 0.03, 8.5), aptGroundMat);
-  lawn.position.set(31, PAD + 0.015, 8.5); lawn.receiveShadow = true; scene.add(lawn);
+  const lawn = new THREE.Mesh(new THREE.BoxGeometry(11, 0.03, 7), aptGroundMat);
+  lawn.position.set(29, PAD + 0.015, 8.6); lawn.receiveShadow = true; scene.add(lawn);
 }
 
-/* SW block: 롯데백화점 · 호텔 · 어드벤처 */
-building({ x: -10.2, z: 9.2, w: 11.4, d: 9.5, hm: 55, color: '#f1e3d3', roof: '#d8d0c4' });   // 롯데백화점
-building({ x: -22, z: 7.4, w: 9.5, d: 4.4, hm: 120, color: '#ece4da', roof: '#cfd3d0' });   // 롯데호텔월드
-building({ x: -10.2, z: 20.5, w: 11.4, d: 8, hm: 34, color: '#f4ece2', roof: '#d6d6cf' });
-const ADV = { x: -27, z: 19, w: 22, d: 12, hm: 30 };
-building({ ...ADV, color: '#f6e6ee', roof: '#e2d6dc', top: 'none' });                      // 롯데월드 어드벤처
+/* 송파구청 block: east of the mall along 올림픽로 */
+building({ x: 45, z: 7.2, w: 9, d: 6, hm: 30, color: '#e9e4da', roof: '#d1d6d0' });          // 송파구청
+building({ x: 53.4, z: 7.6, w: 5, d: 6, hm: 24, color: '#e3e9ee', roof: '#cfd6d9' });
+building({ x: 47.5, z: 15.6, w: 10, d: 5, hm: 40, color: '#f0e7dc', roof: '#d6d0c6' });
+{
+  const walls = ['#f6efe4', '#f9e7d6', '#eef1ea', '#f4e9ef', '#e9eef4'];
+  const roofs = ['#e07a5f', '#5f8fcf', '#7fb069', '#d9a441', '#c06c84'];
+  [42.2, 47.6, 53].forEach(x => building({ x, z: 23, w: rr(3.4, 4), d: rr(3, 3.6), hm: rr(8, 13), color: pick(walls), kind: 'plain', top: 'hip', roofColor: pick(roofs) }));
+  const fp = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.4, 6), std('#dfe3e6'));
+  fp.position.set(40, PAD + 1.2, 4.0); scene.add(fp);
+}
+
+/* SW block: 롯데백화점 · 롯데호텔월드 · 롯데월드 어드벤처 */
+building({ x: -9.2, z: 8.2, w: 10.4, d: 9, hm: 55, color: '#f1e3d3', roof: '#d8d0c4' });     // 롯데백화점 잠실점
+building({ x: -21.5, z: 6.4, w: 10, d: 4.4, hm: 120, color: '#ece4da', roof: '#cfd3d0' });   // 롯데호텔월드
+building({ x: -7.6, z: 20, w: 8.6, d: 9, hm: 30, color: '#f4ece2', roof: '#d6d6cf' });       // 롯데마트 쪽 상가
+const ADV = { x: -22.5, z: 20, w: 20, d: 11, hm: 30 };
+building({ ...ADV, color: '#f6e6ee', roof: '#e2d6dc', top: 'none' });                        // 롯데월드 어드벤처
 const glassMat = new THREE.MeshStandardMaterial({ color: '#c6e6f3', transparent: true, opacity: 0.42, roughness: 0.08, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false });
 const balloons = [];
 {
@@ -663,30 +700,28 @@ const balloons = [];
     const eg = new THREE.CircleGeometry(R, 28, 0, Math.PI); eg.rotateY(Math.PI / 2); eg.scale(1, 0.46, 1);
     const end = new THREE.Mesh(eg, glassMat); end.position.set(ADV.x + s * (ADV.w - 0.6) / 2, top, ADV.z); scene.add(end);
   }
-  // ribs
   for (let i = -4; i <= 4; i++) {
     const rg = new THREE.TorusGeometry(R, 0.05, 6, 24, Math.PI); rg.rotateY(Math.PI / 2); rg.scale(1, 0.46, 1);
-    const rib = new THREE.Mesh(rg, std('#f7f2f4')); rib.position.set(ADV.x + i * 2.35, top, ADV.z); scene.add(rib);
+    const rib = new THREE.Mesh(rg, std('#f7f2f4')); rib.position.set(ADV.x + i * 2.15, top, ADV.z); scene.add(rib);
   }
   ['#ff8fa3', '#ffd166', '#7cc6fe', '#b892ff', '#8ee3a5'].forEach((c, i) => {
     const b = new THREE.Group();
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), std(c, { roughness: 0.5 })); ball.scale.y = 1.12; b.add(ball);
     const basket = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.22), std('#8a6a4a')); basket.position.y = -0.68; b.add(basket);
-    b.position.set(ADV.x - 8 + i * 4, top + 0.9, ADV.z + (i % 2 ? 1.6 : -1.6));
+    b.position.set(ADV.x - 7.5 + i * 3.7, top + 0.9, ADV.z + (i % 2 ? 1.5 : -1.5));
     b.userData = { y0: b.position.y, ph: i * 1.3 };
     scene.add(b); balloons.push(b);
   });
 }
 
-/* Magic Island in 서호 */
-const ISLAND = { x: -25, z: 40, r: 6 };
+/* Magic Island in 서호, linked to the indoor park by a bridge over 잠실로 */
+const ISLAND = { x: -18.5, z: 48.5, r: 5.8 };
 let gyroRing, coasterCurve, coasterCart;
 {
   const isl = new THREE.Mesh(new THREE.CylinderGeometry(ISLAND.r, ISLAND.r + 0.25, 0.5, 40), [std('#d9c7a5'), std('#f1e2d8'), std('#d9c7a5')]);
   isl.position.set(ISLAND.x, -0.07, ISLAND.z); isl.receiveShadow = true; isl.castShadow = true; scene.add(isl);
   const gy = 0.18;
-  // castle
-  const castle = new THREE.Group(); castle.position.set(ISLAND.x + 0.6, gy, ISLAND.z + 1.0); scene.add(castle);
+  const castle = new THREE.Group(); castle.position.set(ISLAND.x + 0.6, gy, ISLAND.z + 0.8); scene.add(castle);
   const cream = std('#fbf4ea'), blue = std('#7f9fe6', { roughness: 0.6 }), pink = std('#f3a6c4', { roughness: 0.6 });
   const keepBase = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.1, 2.4), cream); keepBase.position.y = 0.55; castle.add(keepBase);
   const addTower = (x, z, r, h, roof, rh) => {
@@ -701,19 +736,17 @@ let gyroRing, coasterCurve, coasterCart;
   addTower(-1.45, 1.1, 0.42, 1.7, pink, 1.0);
   addTower(1.45, 1.1, 0.42, 1.7, pink, 1.0);
   keepBase.castShadow = true;
-  addFoot(ISLAND.x + 0.6, ISLAND.z + 1.0, 4, 3.4);
-  // gyro drop
-  const gx = ISLAND.x - 3.4, gz = ISLAND.z - 1.6;
+  addFoot(ISLAND.x + 0.6, ISLAND.z + 0.8, 4, 3.4);
+  const gx = ISLAND.x - 3.3, gz = ISLAND.z - 1.5;
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 7.2, 10), std('#e8e4ee')); pole.position.set(gx, gy + 3.6, gz); pole.castShadow = true; scene.add(pole);
   const cap = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), std('#ff8fa3')); cap.position.set(gx, gy + 7.25, gz); scene.add(cap);
   gyroRing = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.14, 8, 20), std('#ffcf5a', { roughness: 0.5 }));
   gyroRing.rotation.x = Math.PI / 2; gyroRing.position.set(gx, gy + 0.6, gz); gyroRing.castShadow = true; scene.add(gyroRing);
   addFoot(gx, gz, 0.8, 0.8);
-  // little coaster loop around the island
   const pts = [];
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2;
-    const rad = 4.9 + Math.sin(a * 3) * 0.35;
+    const rad = 4.6 + Math.sin(a * 3) * 0.3;
     pts.push(new THREE.Vector3(ISLAND.x + Math.cos(a) * rad, gy + 0.7 + (Math.sin(a * 2 + 0.6) + 1) * 0.75, ISLAND.z + Math.sin(a) * rad));
   }
   coasterCurve = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
@@ -726,85 +759,65 @@ let gyroRing, coasterCurve, coasterCart;
   }
   coasterCart = new THREE.Mesh(new RoundedBoxGeometry(0.55, 0.22, 0.3, 2, 0.07), std('#3d7fd6', { roughness: 0.5 }));
   coasterCart.castShadow = true; scene.add(coasterCart);
-  // skybridge from Adventure over 잠실로 to the island
-  const bridge = new THREE.Mesh(new RoundedBoxGeometry(1.4, 0.5, 8.6, 2, 0.12), std('#f4c9d8'));
-  bridge.position.set(-25, 1.6, 29.4); bridge.castShadow = true; scene.add(bridge);
-  [25.8, 31.2, 33.0].forEach(z => {
+  // bridge from the indoor park over 잠실로 to the island
+  const z0 = ADV.z + ADV.d / 2, z1 = ISLAND.z - ISLAND.r + 0.4;
+  const bridge = new THREE.Mesh(new RoundedBoxGeometry(1.4, 0.5, z1 - z0, 2, 0.12), std('#f4c9d8'));
+  bridge.position.set(ISLAND.x, 1.6, (z0 + z1) / 2); bridge.castShadow = true; scene.add(bridge);
+  [z0 + 0.8, JR + 2.4, (JR + z1) / 2 + 2, z1 - 0.6].forEach(z => {
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.5, 8), std('#e9e1e6'));
-    leg.position.set(-25, 0.6, z); leg.castShadow = true; scene.add(leg);
+    leg.position.set(ISLAND.x, 0.6, z); leg.castShadow = true; scene.add(leg);
   });
+  addFoot(ISLAND.x, (z0 + JR - 1.8) / 2, 1.4, JR - 1.8 - z0);
 }
 
-/* NW block: 갤러리아팰리스 · 롯데캐슬 + apartments */
-[[-8, -8.2], [-14, -8.2], [-8, -15.4], [-14, -15.4]].forEach(([x, z]) =>
+/* 갤러리아팰리스 — west of 롯데월드 on the south side of 올림픽로 */
+[[-51.2, 8.4], [-44.6, 8.4], [-51.2, 15.4], [-44.6, 15.4]].forEach(([x, z]) =>
   building({ x, z, w: 3.6, d: 3.6, hm: 160, color: '#ece2d4', roof: '#d6d2c9' }));
-[[-22.5, -8.4], [-22.5, -16]].forEach(([x, z]) =>
-  building({ x, z, w: 3.4, d: 3.6, hm: 130, color: '#f1ebe1', roof: '#cdd2cf' }));
-const STRIPES = ['#e48a6e', '#6e9fd8', '#7cbf8e', '#d7a64a'];
-[-28.6, -34.2, -39.8].forEach((z, r) => [-23.5, -14.5, -6.2].forEach((x, c) =>
-  aptSlab(x, z, 6, 1.6, 62 + ((r + c) % 3) * 8, null, STRIPES[(r + c) % 4])));
-[-6.5, -12.4, -18.3].forEach((z, r) => [-53, -45, -37].forEach((x, c) =>
-  aptSlab(x, z, 6.4, 1.6, 58 + ((r * 2 + c) % 3) * 9, null, STRIPES[(r + c + 1) % 4])));
-// school + running track
-building({ x: -50.5, z: -40, w: 11, d: 2.6, hm: 15, color: '#f1d8b6', roof: '#d9c3a3', top: 'none' });
-{
-  const L = { cx: -44.5, cz: -31.2, rx: 6, rz: 3.4, rot: 0 };
-  const ring = ellipsePath(L, 0.9); ring.holes.push(ellipsePath(L, 0, 64, THREE.Path));
-  const rg = new THREE.ShapeGeometry(ring, 1); rg.rotateX(-Math.PI / 2);
-  const tr = new THREE.Mesh(rg, std('#d66b52')); tr.position.y = PAD + 0.012; tr.receiveShadow = true; scene.add(tr);
-  const fg = new THREE.ShapeGeometry(ellipsePath(L, 0), 1); fg.rotateX(-Math.PI / 2);
-  const fd = new THREE.Mesh(fg, std('#7fbf5e')); fd.position.y = PAD + 0.012; fd.receiveShadow = true; scene.add(fd);
-  addFoot(-44.5, -31.2, 14, 9);
-}
-aptSlab(-34.6, -28.2, 5.6, 1.6, 66, null, STRIPES[1]);
-aptSlab(-34.6, -40.6, 5.6, 1.6, 66, null, STRIPES[2]);
+building({ x: -50, z: 23.4, w: 10, d: 4.6, hm: 16, color: '#f3ece2', roof: '#d6d6cf' });
+building({ x: -42.2, z: 23.4, w: 5, d: 4.6, hm: 22, color: '#e6ecf0', roof: '#cfd6d9' });
 
-/* NE block: 잠실주공5단지 — 15-storey slabs with their 동 numbers painted on the gable */
+/* NE corner: 잠실 롯데캐슬골드 (36F) right at the station */
+building({ x: 6.2, z: -8.2, w: 4.6, d: 5.2, hm: 125, color: '#f1e9dc', roof: '#cfd2cd' });
+building({ x: 6.2, z: -17.5, w: 4.8, d: 7, hm: 18, color: '#eef0ea', roof: '#d2d6d1' });
+building({ x: 6.2, z: -34, w: 4.6, d: 8, hm: 24, color: '#ece6f0', roof: '#d6d2df' });
+
+const STRIPES = ['#e48a6e', '#6e9fd8', '#7cbf8e', '#d7a64a'];
+const ROSE = ['#e58aa3', '#d9738f', '#efa0b4'];
+
+/* NW: 잠실주공5단지 — 30 slabs of 15 storeys with their 동 numbers on the gable */
 {
   let n = 501;
-  [-9, -16.5, -24, -31.5, -39].forEach((z, r) => [7.5, 17.5, 27.5, 37.5].forEach((x, c) => {
-    if (r === 2 && c === 2) return;                    // playground slot
+  [-7.6, -13.9, -20.2, -28.4, -34.8, -41.2].forEach((z, r) => [-51, -41.5, -32, -22.5, -13].forEach((x, c) => {
     aptSlab(x, z, 7.5, 1.7, 42, n++, STRIPES[(r + c) % 4]);
   }));
-  // playground
-  const pg = new THREE.Group(); pg.position.set(27.5, PAD, -24); scene.add(pg);
-  const sand = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.04, 2.4), std('#ecd9a8')); sand.position.y = 0.02; pg.add(sand);
-  const slideTop = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), std('#ff8f70')); slideTop.position.set(-1.2, 0.35, 0); pg.add(slideTop);
-  const slide = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 0.45), std('#ffd166')); slide.position.set(-0.3, 0.35, 0); slide.rotation.z = -0.5; pg.add(slide);
+  building({ x: -5.6, z: -12.5, w: 4.2, d: 8, hm: 10, color: '#efe7da', roof: '#d6d0c6' });   // 5단지 상가
+  const pg = new THREE.Group(); pg.position.set(-5.8, PAD, -33); scene.add(pg);
+  const sand = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.04, 2.4), std('#ecd9a8')); sand.position.y = 0.02; pg.add(sand);
+  const slideTop = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), std('#ff8f70')); slideTop.position.set(-1.1, 0.35, 0); pg.add(slideTop);
+  const slide = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 0.45), std('#ffd166')); slide.position.set(-0.2, 0.35, 0); slide.rotation.z = -0.5; pg.add(slide);
   const swing = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 6, 16, Math.PI), std('#6e9fd8')); swing.position.set(1.3, 0.05, 0); pg.add(swing);
   [slideTop, slide, swing].forEach(m => (m.castShadow = true));
-  addFoot(27.5, -24, 4.5, 2.4);
+  addFoot(-5.8, -33, 4.2, 2.4);
 }
 
-/* NE2: 송파구청 + offices */
-building({ x: 51.4, z: -9.5, w: 9, d: 6, hm: 30, color: '#e9e4da', roof: '#d1d6d0' });
-building({ x: 50.5, z: -21, w: 8, d: 5, hm: 42, color: '#e3e9ee', roof: '#cfd6d9' });
-building({ x: 50, z: -32, w: 7, d: 6, hm: 26, color: '#f0e7dc', roof: '#d6d0c6' });
-{ // flagpole at 구청
-  const fp = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.4, 6), std('#dfe3e6'));
-  fp.position.set(46.7, PAD + 1.2, -6); scene.add(fp);
-}
-
-/* SE2: low-rise 신천동 houses with hip roofs */
+/* NE: 잠실장미아파트 1·2·3차 — directly across 올림픽로 from the tower, rose-striped */
 {
-  const walls = ['#f6efe4', '#f9e7d6', '#eef1ea', '#f4e9ef', '#e9eef4'];
-  const roofs = ['#e07a5f', '#5f8fcf', '#7fb069', '#d9a441', '#c06c84'];
-  [44.5, 49.6, 54.6].forEach((x, c) => [6.2, 11.2, 16.2, 21.6].forEach((z, r) => {
-    const hip = (c + r) % 3 !== 0;
-    building({ x, z, w: rr(3, 3.6), d: rr(3, 3.6), hm: hip ? rr(8, 13) : rr(14, 22), color: pick(walls), kind: hip ? 'plain' : 'office',
-      roof: '#d9d4cb', top: hip ? 'hip' : 'box', roofColor: pick(roofs) });
+  const cols = [17.6, 26.4, 35.2, 44, 52.6];
+  [-8, -15.2, -28.6, -35.2, -41.4].forEach((z, r) => cols.forEach((x, c) => {
+    if (r === 4 && c === 4) return;                    // board corner
+    aptSlab(x, z, 7, 1.7, 39, null, ROSE[(r + c) % 3], '#fbf6f4');
   }));
 }
-/* SW2: mid-rise offices */
-[[-53.5, 7.2], [-46, 7.2], [-53.5, 14.5], [-46, 14.5], [-53.5, 21.6], [-46, 21.6]].forEach(([x, z], i) =>
-  building({ x, z, w: rr(5.6, 6.4), d: rr(4.4, 5.4), hm: [24, 45, 33, 18, 40, 28][i], color: ['#efe9e1', '#e2e8ed', '#f3e6da'][i % 3], roof: '#d3d8d4' }));
+
+/* 레이크팰리스 — west shore of 서호 */
+[36.6, 42.6, 48.6, 54.6, 60.4].forEach((z, i) => aptSlab(-52.3, z, 8, 1.6, 70 + (i % 2) * 12, null, STRIPES[(i + 1) % 4]));
 
 /* Station exits (green roof = 2호선 side, pink roof = 8호선 side) */
 {
   const glass = new THREE.MeshStandardMaterial({ color: '#dbe8ee', roughness: 0.2, transparent: true, opacity: 0.85 });
   const exits = [
-    [-3.75, -5.8, 'z', '#e2156b'], [3.75, -5.8, 'z', '#e2156b'], [-3.75, 5.8, 'z', '#e2156b'], [3.75, 5.8, 'z', '#e2156b'],
-    [-12, -3.55, 'x', '#2f9e3c'], [14, -3.55, 'x', '#2f9e3c'], [16, 3.55, 'x', '#2f9e3c'], [-18.5, 3.55, 'x', '#2f9e3c']
+    [-3.4, -5.8, 'z', '#e2156b'], [3.4, -5.8, 'z', '#e2156b'], [-3.4, 5.8, 'z', '#e2156b'], [3.4, 5.8, 'z', '#e2156b'],
+    [-12, -3.55, 'x', '#2f9e3c'], [15, -3.55, 'x', '#2f9e3c'], [15, 3.55, 'x', '#2f9e3c'], [-17.5, 3.55, 'x', '#2f9e3c']
   ];
   exits.forEach(([x, z, ax, col]) => {
     const w = ax === 'x' ? 1.2 : 0.7, d = ax === 'x' ? 0.7 : 1.2;
@@ -820,7 +833,7 @@ const signalHeads = [];
 {
   const poleMat = std('#4b525c', { roughness: 0.6 });
   const corners = [[-2.9, -2.9, 'NS'], [2.9, 2.9, 'NS'], [2.9, -2.9, 'EW'], [-2.9, 2.9, 'EW'],
-                   [-2.9, 25.9, 'NS2'], [2.9, 30.1, 'NS2'], [2.9, 25.9, 'EW2'], [-2.9, 30.1, 'EW2']];
+                   [-2.9, JR - 2.1, 'NS2'], [2.9, JR + 2.1, 'NS2'], [2.9, JR - 2.1, 'EW2'], [-2.9, JR + 2.1, 'EW2']];
   corners.forEach(([x, z, grp]) => {
     const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6), poleMat); p.position.set(x, 0.75, z); p.castShadow = true; scene.add(p);
     const head = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.16, 0.16, 2, 0.04), std('#30353c')); head.position.set(x, 1.5, z); scene.add(head);
@@ -830,8 +843,8 @@ const signalHeads = [];
   });
 }
 const lampPos = [];
-for (let x = X0 + 4; x <= X1 - 4; x += 6.5) if (Math.abs(x) > 5) { lampPos.push([x, -3.05], [x, 3.05]); if (Math.abs(x) > 4.8) lampPos.push([x, 25.75], [x, 30.25]); }
-for (let z = Z0 + 3; z <= Z1 - 3; z += 6.5) if (Math.abs(z) > 5 && Math.abs(z - 28) > 4.6) lampPos.push([-3.05, z], [3.05, z]);
+for (let x = X0 + 4; x <= X1 - 4; x += 6.5) if (Math.abs(x) > 5) lampPos.push([x, -3.05], [x, 3.05], [x, JR - 2.25], [x, JR + 2.25]);
+for (let z = Z0 + 3; z <= Z1 - 3; z += 6.5) if (Math.abs(z) > 5 && Math.abs(z - JR) > 4.6) lampPos.push([-3.05, z], [3.05, z]);
 const lampBulbMat = new THREE.MeshStandardMaterial({ color: '#fff6dc', emissive: '#ffd27a', emissiveIntensity: 0 });
 const glowMat = new THREE.MeshBasicMaterial({ color: '#ffcf7a', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
 {
@@ -859,6 +872,7 @@ function canTree(x, z, r = 0.55) {
   if (Math.hypot(qx, qz) > 5) return false;
   if (onRoad(x, z, 0.45)) return false;
   if (LAKES.some(L => inEllipse(L, x, z, 1.6))) return false;
+  if (Math.hypot(x - 52.6, z - 62.6) < 3.2) return false;          // compass rose
   if (blocked(x, z, r)) return false;
   return !trees.some(t => (t.x - x) ** 2 + (t.z - z) ** 2 < 1.0);
 }
@@ -867,20 +881,19 @@ function addTree(x, z, kind, s = rr(0.85, 1.15), y) {
 }
 // street trees — 은행나무 along the big roads
 for (let x = X0 + 2; x <= X1 - 2; x += 2.4) {
-  [-3.75, 3.75, 24.95, 31.05].forEach(z => { if (Math.abs(x) > 5.2 && canTree(x, z, 0.35)) addTree(x, z, 'ginkgo'); });
+  [-3.75, 3.75, JR - 2.95, JR + 2.95].forEach(z => { if (Math.abs(x) > 5.2 && canTree(x, z, 0.35)) addTree(x, z, 'ginkgo'); });
 }
 for (let z = Z0 + 2; z <= Z1 - 2; z += 2.4) {
-  [-3.75, 3.75].forEach(x => { if (Math.abs(z) > 5.2 && Math.abs(z - 28) > 5 && canTree(x, z, 0.35)) addTree(x, z, 'ginkgo'); });
+  [-3.75, 3.75].forEach(x => { if (Math.abs(z) > 5.2 && Math.abs(z - JR) > 5 && canTree(x, z, 0.35)) addTree(x, z, 'ginkgo'); });
 }
 // 석촌호수 벚꽃길 — cherry trees ringing both lakes
 LAKES.forEach(L => {
-  const n = 74;
+  const n = 76;
   for (let i = 0; i < n; i++) {
     const [x, z] = ellipsePoint(L, (i / n) * Math.PI * 2, 2.3);
-    if (!onRoad(x, z, 0.5) && x > X0 + 1 && x < X1 - 1 && z < Z1 - 1.2) addTree(x, z, 'cherry', rr(0.95, 1.2), 0);
+    if (!onRoad(x, z, 0.5) && !blocked(x, z, 0.2) && x > X0 + 1 && x < X1 - 1 && z < Z1 - 1.2) addTree(x, z, 'cherry', rr(0.95, 1.2), 0);
   }
 });
-// park + courtyard trees
 function scatter(x0, x1, z0, z1, count, kind) {
   let placed = 0;
   for (let k = 0; k < count * 8 && placed < count; k++) {
@@ -888,14 +901,16 @@ function scatter(x0, x1, z0, z1, count, kind) {
     if (canTree(x, z)) { addTree(x, z, kind); placed++; }
   }
 }
-scatter(X0 + 1, X1 - 1, 31, Z1 - 1, 120, 'tree');
-scatter(-6, 6, 31, Z1 - 1, 20, 'cherry');
-scatter(2.8, 42.6, -43.5, -2.8, 110, 'tree');
-scatter(-57.5, -2.8, -43.5, -2.8, 90, 'tree');
-scatter(24.5, 37.5, 4.5, 12.6, 16, 'tree');
-scatter(41.4, 57.5, 2.8, 25.9, 12, 'tree');
-scatter(45.4, 57.5, -43.5, -2.8, 14, 'tree');
-scatter(-38.6, -2.8, 2.8, 25.9, 8, 'tree');
+scatter(-46, X1 - 1, JR + 2.5, Z1 - 1, 120, 'tree');
+scatter(-6, 6, JR + 2.5, Z1 - 1, 18, 'cherry');
+scatter(-57.5, -2.8, -43.5, -2.8, 110, 'tree');
+scatter(12.4, 57.5, -43.5, -2.8, 100, 'tree');
+scatter(2.8, 9.6, -43.5, -2.8, 10, 'tree');
+scatter(23.5, 34.5, 5, 12.4, 14, 'tree');
+scatter(38.4, 57.5, 2.8, JR - 2.1, 12, 'tree');
+scatter(-57.5, -38.4, 2.8, JR - 2.1, 14, 'tree');
+scatter(-35.6, -2.8, 2.8, JR - 2.1, 8, 'tree');
+scatter(-57.5, -47.2, JR + 2.1, 67.5, 16, 'tree');
 
 const trunkMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.1, 0.55, 5), std('#8a6447'), trees.length);
 const crownMat = new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true });
@@ -923,7 +938,7 @@ LAKES.forEach((L, li) => {
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), std('#fbfbf6', { roughness: 0.6 })); body.scale.set(1.3, 0.7, 0.9); g.add(body);
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), std(i % 2 ? '#fbfbf6' : '#3f8f5a', { roughness: 0.6 })); head.position.set(0.3, 0.22, 0); g.add(head);
     const beak = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 6), std('#f4a53a')); beak.rotation.z = -Math.PI / 2; beak.position.set(0.47, 0.2, 0); g.add(beak);
-    g.userData = { L, grow: -(li === 0 ? 7.5 : 4) - i * 0.9, t: rand() * Math.PI * 2, sp: rr(0.05, 0.08) * (i % 2 ? 1 : -1) };
+    g.userData = { L, grow: li === 0 ? -1.4 - i * 0.3 : -3.5 - i * 0.8, t: rand() * Math.PI * 2, sp: rr(0.05, 0.08) * (i % 2 ? 1 : -1) };
     g.position.y = -0.08; scene.add(g); ducks.push(g);
   }
 });
@@ -937,12 +952,12 @@ lane('x', 0.7, 1, X0, X1, [[-4.6, 'EW']]);
 lane('x', 1.8, 1, X0, X1, [[-4.6, 'EW']], true);
 lane('x', -0.7, -1, X0, X1, [[4.6, 'EW']]);
 lane('x', -1.8, -1, X0, X1, [[4.6, 'EW']], true);
-lane('z', -0.7, 1, Z0, Z1, [[-4.6, 'NS'], [24.3, 'NS2']]);
-lane('z', -1.8, 1, Z0, Z1, [[-4.6, 'NS'], [24.3, 'NS2']], true);
-lane('z', 0.7, -1, Z0, Z1, [[4.6, 'NS'], [31.7, 'NS2']]);
-lane('z', 1.8, -1, Z0, Z1, [[4.6, 'NS'], [31.7, 'NS2']], true);
-lane('x', 28.9, 1, X0, X1, [[-4.6, 'EW2']]);
-lane('x', 27.1, -1, X0, X1, [[4.6, 'EW2']]);
+lane('z', -0.7, 1, Z0, Z1, [[-4.6, 'NS'], [JR - 3.7, 'NS2']]);
+lane('z', -1.8, 1, Z0, Z1, [[-4.6, 'NS'], [JR - 3.7, 'NS2']], true);
+lane('z', 0.7, -1, Z0, Z1, [[4.6, 'NS'], [JR + 3.7, 'NS2']]);
+lane('z', 1.8, -1, Z0, Z1, [[4.6, 'NS'], [JR + 3.7, 'NS2']], true);
+lane('x', JR + 0.9, 1, X0, X1, [[-4.6, 'EW2']]);
+lane('x', JR - 0.9, -1, X0, X1, [[4.6, 'EW2']]);
 
 function paint(g, rgb) { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set(rgb, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; }
 const carGeo = mergeGeometries([
@@ -957,7 +972,7 @@ const vehMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0
 const CAR_COLORS = ['#f5f3ee', '#f5f3ee', '#3b4250', '#c7ccd3', '#f08a24', '#f08a24', '#f28b82', '#7fb3e6', '#ffd166', '#9ad3a6', '#c3a6e0'];
 let nCar = 0, nBus = 0;
 lanes.forEach(ln => {
-  const count = Math.round(ln.L / (ln.axis === 'x' && Math.abs(ln.c - 28) < 2 ? 15 : 12));
+  const count = Math.round(ln.L / (ln.axis === 'x' && Math.abs(ln.c - JR) < 2 ? 15 : 12));
   for (let i = 0; i < count; i++) {
     const bus = ln.buses && rand() < 0.3;
     ln.veh.push({ s: (i + rr(0, 0.5)) * ln.L / count, v: 0, len: bus ? 1.55 : 0.82, bus, vmax: bus ? rr(2.8, 3.3) : rr(3.8, 4.8), idx: bus ? nBus++ : nCar++ });
@@ -1023,20 +1038,23 @@ function label(html, x, y, z, cls = '') {
 }
 label('<span class="ln l2">2</span><span class="ln l8">8</span>잠실역', 0, 1.6, 0, 'station');
 label('롯데월드타워 <small>555m</small>', TOWER.x, PAD + TOWER.h + 4.8, TOWER.z);
-label('롯데월드몰', 10, PAD + H(35) + 0.6, 19.5, 'minor');
-label('롯데백화점', -10.2, PAD + H(55) + 0.6, 9.2, 'minor');
-label('롯데호텔월드', -22, PAD + H(120) + 0.6, 7.4, 'minor');
-label('롯데월드 어드벤처', ADV.x - 6, PAD + H(ADV.hm) + 3.4, ADV.z);
-label('매직아일랜드', ISLAND.x + 0.6, 6.2, ISLAND.z + 1);
-label('석촌호수 서호', -33, 0.6, 54);
-label('석촌호수 동호', 32, 0.6, 50);
-label('갤러리아팰리스', -11, PAD + H(160) + 0.6, -11.8, 'minor');
-label('잠실주공5단지', 22.5, PAD + H(42) + 1.4, -24);
-label('송파구청', 51.4, PAD + H(30) + 0.6, -9.5, 'minor');
-label('올림픽로', -48, 0.08, 0, 'road');
-label('올림픽로', 48, 0.08, 0, 'road');
-label('송파대로', 0, 0.08, -36, 'road');
-label('잠실로', 50, 0.08, 28, 'road');
+label('롯데월드몰', 9, PAD + H(35) + 0.6, 19.6, 'minor');
+label('롯데백화점', -9.2, PAD + H(55) + 0.6, 8.2, 'minor');
+label('롯데호텔월드', -21.5, PAD + H(120) + 0.6, 6.4, 'minor');
+label('롯데월드 어드벤처', ADV.x - 5, PAD + H(ADV.hm) + 3.4, ADV.z);
+label('매직아일랜드', ISLAND.x + 0.6, 6.2, ISLAND.z + 0.8);
+label('석촌호수 서호', -32, 0.6, 55);
+label('석촌호수 동호', 34, 0.6, 50);
+label('잠실주공5단지', -27, PAD + H(42) + 1.4, -24);
+label('잠실장미아파트', 33, PAD + H(39) + 1.4, -24);
+label('롯데캐슬골드', 6.2, PAD + H(125) + 0.6, -8.2, 'minor');
+label('갤러리아팰리스', -47.9, PAD + H(160) + 0.6, 11.9, 'minor');
+label('송파구청', 45, PAD + H(30) + 0.6, 7.2, 'minor');
+label('레이크팰리스', -52.3, PAD + H(82) + 0.8, 48.6, 'minor');
+label('올림픽로', -30, 0.08, 0, 'road');
+label('올림픽로', 47, 0.08, 0, 'road');
+label('송파대로', 0, 0.08, -38, 'road');
+label('잠실로', 46, 0.08, JR, 'road');
 
 /* ---------------- post: tilt-shift ---------------- */
 const rt = new THREE.WebGLRenderTarget(innerWidth * DPR, innerHeight * DPR, { type: THREE.HalfFloatType, samples: 4 });
@@ -1142,6 +1160,8 @@ window.addEventListener('resize', () => {
 /* ---------------- loop ---------------- */
 goHome();
 const clock = new THREE.Clock();
+const p0 = new THREE.Vector3(), p1 = new THREE.Vector3();
+const northEl = document.getElementById('north');
 let simT = 0;
 function frame() {
   const rawDt = clock.getDelta();
@@ -1170,6 +1190,12 @@ function frame() {
     d.position.y = -0.08 + Math.sin(simT * 2 + ud.t * 9) * 0.015;
   });
   controls.update();
+  {
+    p0.set(0, 0, 0).project(camera);
+    p1.set(-Math.sin(GRID_ROT) * 10, 0, -Math.cos(GRID_ROT) * 10).project(camera);
+    const ang = Math.atan2((p1.x - p0.x) * innerWidth, (p1.y - p0.y) * innerHeight);
+    northEl.style.transform = `rotate(${ang}rad)`;
+  }
   composer.render();
   if (state.labels) labelRenderer.render(scene, camera);
   requestAnimationFrame(frame);
